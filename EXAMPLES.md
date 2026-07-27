@@ -1,7 +1,11 @@
 # Examples
 
 What a filled-in `CLAUDE.md` looks like for real projects. Copy the one closest to yours
-and edit — or run the skill and let it generate this from your actual repo.
+and edit.
+
+Note what varies: **the ladder is trimmed to rungs that actually exist.** Two of the three
+below drop semantic search entirely, because `grep` wins for code. Only the docs repo — a
+bounded, citation-sensitive, repeatedly-queried corpus — earns the extra rung.
 
 ---
 

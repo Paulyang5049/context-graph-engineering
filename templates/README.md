@@ -1,7 +1,17 @@
 # Templates
 
+The retrieval policy as droppable files.
+
 ```bash
-cp templates/CLAUDE.md your-project/          # the main event
+curl -o CLAUDE.md https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/templates/CLAUDE.md
+curl -o MEMORY.md https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/templates/MEMORY.md
+mkdir -p memory
+```
+
+Or, from a clone:
+
+```bash
+cp templates/CLAUDE.md your-project/          # the policy
 cp templates/MEMORY.md your-project/          # optional: corrections that stick
 cp -r templates/memory  your-project/         # optional: the memory content
 ```

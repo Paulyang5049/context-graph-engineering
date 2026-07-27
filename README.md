@@ -21,20 +21,56 @@ instructions for finding information faster and more accurately, not products of
 
 One cause: **context is finite and expensive, and most setups spend it like it's free.**
 
-## The fix
+## Install
 
-```bash
-git clone https://github.com/Paulyang5049/context-graph-engineering.git
-cp context-graph-engineering/templates/CLAUDE.md your-project/
+**Option A — the skill (recommended).** Installs a `/context-engineering` skill that reads
+your repo, asks two or three questions, and writes a `CLAUDE.md` tailored to it. Run it
+once at the start of a project.
+
+```
+/plugin marketplace add Paulyang5049/context-graph-engineering
+/plugin install context-engineering@context-graph-engineering
 ```
 
-Fill in the `[bracketed]` parts, set your real lint/test commands, delete the
-`<!-- comments -->`. Next session picks it up automatically. Cursor and Copilot use the
-same content under a different filename (`.cursorrules`,
-`.github/copilot-instructions.md`).
+Then, in any project:
 
-Add [`templates/MEMORY.md`](templates/MEMORY.md) + [`templates/memory/`](templates/memory)
-if you want the agent to remember corrections between sessions.
+```
+> use the context-engineering skill to set up this repo
+```
+
+It detects your stack, test and lint commands, and generated directories; asks what the
+agent keeps getting wrong; and writes the file. No placeholders left behind.
+
+**Option B — just take the file.** One command, no install:
+
+```bash
+curl -o CLAUDE.md https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/templates/CLAUDE.md
+```
+
+Appending to an existing `CLAUDE.md` instead:
+
+```bash
+curl https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/templates/CLAUDE.md >> CLAUDE.md
+```
+
+Then fill in the `[bracketed]` parts, set your real lint/test commands, and delete the
+`<!-- comments -->`. See [EXAMPLES.md](EXAMPLES.md) for three filled-in versions.
+
+**Optional — memory**, so corrections survive between sessions:
+
+```bash
+curl -o MEMORY.md https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/templates/MEMORY.md
+mkdir -p memory
+```
+
+**Cursor:**
+
+```bash
+mkdir -p .cursor/rules && curl -o .cursor/rules/context-engineering.mdc \
+  https://raw.githubusercontent.com/Paulyang5049/context-graph-engineering/main/.cursor/rules/context-engineering.mdc
+```
+
+**Copilot:** same content at `.github/copilot-instructions.md`. **Generic:** `AGENTS.md`.
 
 **The whole thing costs ~850 tokens per session.** That's the budget it has to earn back —
 it does so the first time it greps instead of reading a directory.
@@ -88,6 +124,27 @@ makes every future session cheaper at zero cost.
 > expensive documentation in the repo per line. Anything that applies to one kind of task
 > belongs in a linked doc the agent opens when it needs it.
 
+Three filled-in examples — Python service, TypeScript monorepo, docs repo — in
+[EXAMPLES.md](EXAMPLES.md).
+
+## How to know it's working
+
+- The agent runs `grep` before it starts opening files.
+- Answers arrive with `file.py:42` attached instead of "somewhere in the auth module."
+- It says "these two docs disagree" instead of confidently picking the stale one.
+- Session cost stops scaling with repo size.
+- You stop re-explaining the same convention every Monday.
+
+If none of that changes, the file is probably too long or too generic — it's competing
+with your code for attention rather than directing it. Cut it.
+
+## When not to bother
+
+Single-file scripts, throwaway prototypes, repos where `ls` shows you everything. The
+retrieval ladder earns its ~850 tokens when navigation is a real cost. Below that, it's
+overhead. This repo argues for spending context deliberately; that includes not spending
+it here.
+
 ---
 
 ## `MEMORY.md` — so corrections stick
@@ -136,6 +193,21 @@ steps. Two ideas worth stealing anyway:
 Details: [`rag/README.md`](rag/README.md).
 
 ---
+
+## What's in here
+
+```
+templates/CLAUDE.md          the file. ~570 tok/session.
+templates/MEMORY.md          optional memory index. ~300 tok/session.
+templates/memory/            annotated example memories
+skills/context-engineering/  the skill that personalizes it for your repo
+.claude-plugin/              plugin + marketplace manifests
+.cursor/rules/               same rules as a Cursor project rule
+EXAMPLES.md                  three filled-in CLAUDE.md files
+docs/                        memory architecture selection guide
+rag/                         optional reference RAG pipeline
+CLAUDE.md, MEMORY.md, memory/   live instances — this repo runs on its own templates
+```
 
 ## Reading
 

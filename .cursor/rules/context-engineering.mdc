@@ -1,0 +1,32 @@
+---
+description: Retrieve information cheaply and accurately — cheapest-first search, cite sources, verify before finishing.
+alwaysApply: true
+---
+
+# Finding things — cheapest first, stop when answered
+
+1. This file and any project memory — already in context, free.
+2. `grep` / file search — precise, cheap, never stale. Resolves most "where is X" in one call.
+3. The project's index or catalog file, if one exists.
+4. Semantic search, only when the question won't match a filename or a grep pattern.
+5. Read the file — only after the steps above point at a specific one. That file, not its neighbours.
+
+**Never read a directory speculatively.** Forty exploratory reads cost more than the task
+and leave less attention for the actual work.
+
+# Answering
+
+- Cite the source of every claim: `path/to/file.py:42`.
+- Quote the minimum. Don't paste whole sections.
+- Check *what kind* of thing you retrieved before trusting it. Imports, tables of
+  contents, and link lists rank high on keyword match while containing nothing. If the
+  top hit is boilerplate, look at the next few.
+- If two sources disagree, say so. Don't silently pick one.
+
+# Before finishing
+
+- Run the project's lint and test commands for the files touched.
+- Re-check claims against the actual source, not a retrieved excerpt.
+
+<!-- Full templates, memory design, and rationale:
+     https://github.com/Paulyang5049/context-graph-engineering -->

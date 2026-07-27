@@ -54,7 +54,7 @@ rag/                ← reference implementation: a readable RAG pipeline in ~25
 ## Quick start
 
 ```bash
-git clone https://github.com/[YOUR-USERNAME]/context-graph-engineering.git
+git clone https://github.com/Paulyang5049/context-graph-engineering.git
 
 # Copy the templates into your project
 cp context-graph-engineering/templates/CLAUDE.md   your-project/

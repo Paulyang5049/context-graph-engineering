@@ -1,0 +1,21 @@
+# RAG index artifacts (regenerate with ingest.py)
+rag/index/
+index/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key

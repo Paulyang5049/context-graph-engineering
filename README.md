@@ -1,234 +1,146 @@
 # Context & Graph Engineering for Developers
 
-**Drop-in `CLAUDE.md` and `MEMORY.md` templates, plus a readable reference RAG
-implementation, for cutting the token cost of coding agents while making their answers
-more accurate.**
+**A `CLAUDE.md` that makes coding agents cheaper and more accurate.** Copy one file into
+your project and the agent stops reading forty files to answer a question that one `grep`
+would have resolved.
 
-Every session with a coding agent starts by paying for context. Most projects pay far
-too much for it, and get worse answers in return. This repo is a small, opinionated set
-of files you put in a project *before* you start working, plus the reasoning for why
-they're shaped the way they are.
+Everything else here — the memory file, the RAG pipeline — exists to serve that. They're
+instructions for finding information faster and more accurately, not products of their own.
 
 ---
 
 ## The problem
 
-You point an agent at a real codebase and one of these happens:
-
-| Symptom | What's actually going on |
+| Symptom | What's actually happening |
 |---|---|
-| **Burning tokens on every session** | The agent reads 40 files to answer a question one `grep` would have resolved. Every project doc is loaded "just in case." |
-| **Confidently wrong answers** | It answered from a file's *name*, or from a heading, or from a keyword-dense index section that ranked high but contained nothing. |
-| **Citing facts that changed months ago** | Memory was append-only. The old fact is still sitting there, and nothing binds the new fact to it. |
-| **Degrades as the session gets longer** | [Context rot](https://research.trychroma.com/context-rot) — retrieval accuracy from within the context window measurably drops as it fills. This is not a metaphor; it's benchmarked. |
-| **Re-explaining the project every morning** | Nothing persists. Conventions, corrections, and decisions evaporate at the end of each session. |
+| Token bills climb with no matching output | The agent reads directories speculatively. Every doc gets loaded "just in case." |
+| Confidently wrong answers | It answered from a filename, a heading, or a keyword-dense index section that ranked high and said nothing. |
+| Cites facts that changed months ago | Nothing bound the new fact to the old one. |
+| Gets worse the longer the session runs | [Context rot](https://research.trychroma.com/context-rot) — recall from within the context window measurably degrades as it fills. |
+| You re-explain the project every morning | Conventions and corrections evaporate at session end. |
 
-These aren't separate problems. They're all the same one: **context is a finite,
-expensive resource, and most setups treat it as free.**
+One cause: **context is finite and expensive, and most setups spend it like it's free.**
 
-## The principle
-
-> Retrieve the smallest set of high-signal tokens that answers the question — not
-> everything that might be relevant.
-
-This is Anthropic's framing in [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents),
-and every rule in this repo is an application of it to a specific situation.
-
-**Concretely, on the corpus in this repo's example:** a 136 KB knowledge base (~22K
-tokens of indexed content) answers a typical question from **355–740 tokens** of
-retrieved context — **1.6–3.4% of the corpus**. The other 96%+ never enters the context
-window, never competes for attention, and never gets billed.
-
-## What's here
-
-```
-templates/          ← the drop-in files. Start here.
-  CLAUDE.md           project instructions: retrieval order, citation rules, conventions
-  MEMORY.md           the memory index (thin, always loaded)
-  memory/             example typed memory files (loaded on demand)
-docs/
-  memory-architectures.md   how to pick a memory design, with benchmark evidence
-rag/                ← reference implementation: a readable RAG pipeline in ~250 lines
-```
-
-## Quick start
+## The fix
 
 ```bash
 git clone https://github.com/Paulyang5049/context-graph-engineering.git
-
-# Copy the templates into your project
-cp context-graph-engineering/templates/CLAUDE.md   your-project/
-cp context-graph-engineering/templates/MEMORY.md   your-project/
-cp -r context-graph-engineering/templates/memory   your-project/
+cp context-graph-engineering/templates/CLAUDE.md your-project/
 ```
 
-Then edit `CLAUDE.md`: fill in the `[bracketed]` sections, set your real lint/test
-commands, delete the `<!-- note -->` comments. Empty out the example memory files. That's
-it — the next agent session picks them up automatically.
+Fill in the `[bracketed]` parts, set your real lint/test commands, delete the
+`<!-- comments -->`. Next session picks it up automatically. Cursor and Copilot use the
+same content under a different filename (`.cursorrules`,
+`.github/copilot-instructions.md`).
 
-Using Cursor or Copilot instead? Same content, different filename
-(`.cursorrules`, `.github/copilot-instructions.md`).
+Add [`templates/MEMORY.md`](templates/MEMORY.md) + [`templates/memory/`](templates/memory)
+if you want the agent to remember corrections between sessions.
+
+**The whole thing costs ~850 tokens per session.** That's the budget it has to earn back —
+it does so the first time it greps instead of reading a directory.
 
 ---
 
-## What the templates actually do
+## What `CLAUDE.md` actually does
 
-### `CLAUDE.md` — spend context deliberately
-
-The core of it is a **retrieval ladder**, cheapest first, stop when answered:
+### 1. A retrieval ladder, cheapest first
 
 ```
 1. CLAUDE.md + MEMORY.md   already in context — free
-2. index / catalog file    a map of what exists
-3. grep / glob             precise, cheap, never stale
-4. semantic search (RAG)   only when the question won't match a filename
-5. full file read          only after 1–4 point at a specific file
+2. grep / glob             precise, cheap, never stale
+3. index / catalog file    a map of what exists
+4. semantic search         only when the question won't match a filename
+5. read the file           only after 1–4 point at a specific one
 ```
 
-The ordering matters more than any individual step. Step 3 resolves most "where is X"
-questions in a single call; jumping straight to step 5 is where the token bills come
-from. Anthropic makes the same point about Claude Code itself — `grep` and `glob` beat
-pre-computed indexes because they're never stale.
+The ordering is the point. Step 2 answers most "where is X" questions in one call;
+jumping straight to step 5 is where the token bills come from. Anthropic makes the same
+argument about [Claude Code itself](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents):
+`grep` and `glob` beat pre-computed indexes because they can't go stale.
 
-It also encodes a rule learned from actually building the pipeline in `rag/`:
+### 2. A rule against trusting the top result
 
-> **Don't trust the top retrieval result blindly.** Similarity rank measures vocabulary
-> overlap, not information content.
-
-We hit this empirically. Querying *"what did Karpathy say about using Claude with
-Obsidian as a second brain"* returned a section that reads, in its entirety:
+Similarity rank measures *vocabulary overlap*, not information content. We hit this
+building the pipeline in `rag/` — querying *"what did Karpathy say about using Claude with
+Obsidian as a second brain"* returned this section, in full:
 
 ```
 ## Entities Mentioned
 - [[Andrej Karpathy]] - [[Obsidian]] - [[Claude]]
 ```
 
-Ranked **above** the paragraph that actually answered the question. It's short and dense
-with the query's exact proper nouns — a perfect similarity match containing zero
-information. Vector DB libraries hide this behind a clean API; an agent that doesn't know
-to check will answer from it. (Full write-up: [`rag/README.md`](rag/README.md).)
+Ranked **above** the paragraph that answered the question. Short, dense with the query's
+exact proper nouns, and containing zero information. Vector DB libraries hide this behind
+a clean API. An agent that doesn't know to check the *kind* of thing it retrieved will
+answer from it.
 
-### `MEMORY.md` — persist without re-inflating
+### 3. Citation and verification rules
 
-Two layers: a **thin index** loaded every session, and **typed memory files** loaded only
-when their topic is live. Four types cover most projects — `project` (decisions and their
-reasons), `feedback` (corrections you shouldn't have to repeat), `user`, `reference`.
+Every claim carries `file.py:42`. Quote the minimum. Run the real lint/test commands
+before finishing. If two sources disagree, say so instead of silently picking one.
 
-The counterintuitive part is covered next.
+### 4. Conventions a linter can't catch
 
----
+And only those. If a formatter already enforces a rule, deleting it from `CLAUDE.md`
+makes every future session cheaper at zero cost.
 
-## Choosing a memory architecture
-
-The memory design in `templates/` is one of several defensible choices. This section
-exists so you can pick deliberately rather than inherit ours.
-
-The evidence base is **"Are We Ready For An Agent-Native Memory System?"**
-([arXiv:2606.24775](https://arxiv.org/abs/2606.24775)) — a systematic benchmark of 12
-agent-memory systems across 11 datasets, which decomposes memory into four separable
-modules (representation, extraction, retrieval, maintenance) and measures each. Its
-headline: **no architecture wins everywhere.** Effectiveness depends on matching the
-structure to your workload's dominant bottleneck.
-
-### The four options
-
-| Architecture | Repo shape | Strongest at | Weakest at |
-|---|---|---|---|
-| **1. Stream + reflection** | Append-only `JOURNAL.md` + periodic distilled summary | Preserving exact wording and chronology; cheap writes | Finding anything far back in the log; unbounded growth |
-| **2. Tiered** ⭐ | `CLAUDE.md` = hot tier, `memory/` = cold tier, explicit promotion | Bounded always-on cost; coarse-to-fine lookup | Needs a sane promote/evict policy |
-| **3. Graph** | One page per entity/concept, wikilinks between them | **Revising facts**; connecting evidence across sessions | Maintenance cost; weaker on temporal reasoning |
-| **4. Hybrid** | Mix of the above, routed by type | Broadest benchmark coverage | Complexity — only worth it when you can name why |
-
-⭐ **The templates here ship #2, with a dash of #3** — because a repo already *has* tiers
-(`CLAUDE.md` is always loaded; `memory/` and `docs/` are not), and because the handful of
-facts that get *revised* often — architecture decisions, service ownership, config — need
-graph-style stable identities.
-
-### Pick by your failure mode
-
-| If your main problem is… | Use | Why |
-|---|---|---|
-| Context blowing up every session | **Tiered** | Bounds the always-on cost; everything else loads on demand |
-| Agent citing facts that changed | **Graph** | The only design that reliably binds an update to an existing identity |
-| Can't connect facts across sessions | **Graph** | Explicit links beat similarity when evidence is scattered |
-| Losing exact names, dates, versions | **Stream**, stored raw | Any summarization step destroys exact recall |
-| Long inputs full of distractors | **Tiered** | Coarse-to-fine narrows attention before generation |
-| Memory upkeep is slow/expensive | **Stream** or **Tiered** | Localized maintenance; avoid graph-wide consolidation |
-
-Full reasoning and the benchmark numbers: [`docs/memory-architectures.md`](docs/memory-architectures.md).
-
-### The finding that changed our template
-
-The first draft of `MEMORY.md` in this repo said *"prefer 5–15 lines per memory; compress
-aggressively."* That was wrong, and the paper says so with numbers. Storing the same
-content three ways:
-
-| Storage format | Exact Match |
-|---|---|
-| **Raw** (verbatim) | **24.2** |
-| Light compression (filler removed, phrasing kept) | 23.6 |
-| **LLM abstractive summary** | **8.5** |
-
-Summarizing at write time cost **~65% of exact-match accuracy** — and adding a deeper
-hierarchy on top did *not* recover it. You cannot retrieve what you deleted.
-
-The resolution is that **there are two budgets, not one**:
-
-| | Budget | Rule |
-|---|---|---|
-| **Disk** (`memory/*.md`) | Effectively unlimited | **Be generous.** Exact names, dates, versions, verbatim quotes. |
-| **Context window** (what loads) | Small and expensive | **Be ruthless.** Index only; open a file when its topic is live. |
-
-Compress at **read** time, not write time. The paper calls this the *late filtering
-principle*, and it's the thing most hand-rolled memory setups get backwards — including
-ours, until we measured it.
-
-Three more findings that shaped the templates:
-
-- **Build revisability in.** Name a memory file after the *thing* (`database.md`), not
-  the *event* (`migration-2026-06.md`). Append-only stores produce what the paper calls
-  *"hallucinations of the past"* — and a stronger model does not fix it.
-- **Write when you learn it.** Batching memory writes to "save tokens" scored *worst* of
-  every maintenance policy tested. Evidence sits unresolved exactly when a query needs it.
-- **Update one file, not all of them.** Global reorganization is the dominant cost driver
-  in every system measured, with no proportional accuracy gain.
+> **Keep it under ~100 lines.** This file is charged on every session — it's the most
+> expensive documentation in the repo per line. Anything that applies to one kind of task
+> belongs in a linked doc the agent opens when it needs it.
 
 ---
 
-## The reference implementation (`rag/`)
+## `MEMORY.md` — so corrections stick
 
-A complete RAG pipeline in ~250 readable lines — no API keys, no model downloads, no
-vector database. It indexes a folder of markdown and retrieves cited chunks.
+A thin index, always loaded; the actual memories in `memory/*.md`, opened only when their
+topic is live. Three rules do most of the work:
+
+- **One file per *thing*, not per event.** `database.md`, not `migration-2026-06.md`, so
+  a new fact overwrites the old one instead of piling up next to it.
+- **Be generous on disk, ruthless about what loads.** Store exact names, dates, versions.
+  Compress at *read* time — you can't retrieve what you deleted at write time.
+- **Write when you learn it.** Batching memory writes to save tokens leaves evidence
+  unresolved exactly when a query needs it.
+
+Those aren't guesses. [Zhou et al. 2026](https://arxiv.org/abs/2606.24775) benchmarked 12
+memory systems across 11 datasets: storing memories as LLM summaries instead of raw text
+dropped Exact Match from **24.2 → 8.5**, and no amount of indexing on top recovered it.
+
+If your situation differs — you need a graph, or a plain journal —
+[`docs/memory-architectures.md`](docs/memory-architectures.md) has the selection guide and
+the evidence. Most projects don't need to read it.
+
+---
+
+## `rag/` — optional, and most projects don't need it
+
+A complete RAG pipeline in ~250 readable lines: no API keys, no model downloads, no vector
+database. It indexes a folder of markdown and returns cited chunks.
 
 ```bash
-cd rag
-pip install -r requirements.txt
+cd rag && pip install -r requirements.txt
 python3 ingest.py /path/to/your/notes --out ./index
 python3 query.py "what is loop engineering?"
 ```
 
-It exists to make the mechanics legible before you reach for a framework. Once you
-understand what these files do, LangChain and Chroma are just faster versions of the same
-six steps. Two design choices worth stealing:
+**Reach for this only when `grep` genuinely can't answer the question** — when queries are
+phrased in language that doesn't appear in the text ("what does this project think about
+X"). For code, `grep` almost always wins. This is mainly here as a teaching artifact: once
+you can read these files, LangChain and Chroma are just faster versions of the same six
+steps. Two ideas worth stealing anyway:
 
-- **Chunk by heading, not by token count.** A fixed 500-token window cuts definitions in
-  half. If your documents have structure, that structure already marks the unit of
-  meaning — use it. (`rag_lib.py::chunk_markdown`)
-- **Keep retrieval and generation separate.** `query.py` never calls an LLM; it prints a
-  context block and stops. Bolting on generation is one line, but keeping the boundary
-  visible makes it obvious exactly what the model is grounded on.
+- **Chunk by heading, not token count.** A fixed 500-token window cuts definitions in half.
+- **Keep retrieval separate from generation.** `query.py` never calls an LLM — it prints
+  the context and stops, so what the model is grounded on stays visible.
 
-Details and the scaling path (dense embeddings, hybrid search, reranking):
-[`rag/README.md`](rag/README.md).
+Details: [`rag/README.md`](rag/README.md).
 
 ---
 
 ## Reading
 
-- [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) — Anthropic Engineering, 2025
-- [Are We Ready For An Agent-Native Memory System?](https://arxiv.org/abs/2606.24775) — Zhou et al., 2026 ([code](https://github.com/OpenDataBox/MemoryData))
+- [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) — Anthropic, 2025
+- [Are We Ready For An Agent-Native Memory System?](https://arxiv.org/abs/2606.24775) — Zhou et al., 2026
 - [Context Rot](https://research.trychroma.com/context-rot) — Chroma Research
 
-## License
-
-MIT — see [LICENSE](LICENSE). Take these, change them, don't credit us.
+MIT — take these, change them, no credit needed.

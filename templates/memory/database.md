@@ -16,7 +16,7 @@ error `40001` and *must* be retried with backoff — this is normal operation, n
 bug. Connection/retry code written before the migration follows Postgres semantics
 and is not a safe pattern to copy.
 
-Related: [[deploy]]
+Related: [[reference-systems]]
 
 <!-- EXAMPLE FILE — replace with a real memory.
      Note what this demonstrates:

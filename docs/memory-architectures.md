@@ -112,7 +112,9 @@ writing, filter when reading. Concretely:
 
 This directly contradicts the intuition that a good memory file is a terse one. The
 resolution is that **there are two different budgets**: disk (be generous) and context
-window (be ruthless). See [`../templates/MEMORY.md`](../templates/MEMORY.md) §"Two budgets".
+window (be ruthless). This is why [`../templates/MEMORY.md`](../templates/MEMORY.md) is an
+index rather than a store: the index is what gets loaded, the detail stays in `memory/*.md`
+until its topic is live.
 
 ### Build revisability into the representation (Finding 3)
 
